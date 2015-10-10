@@ -7,6 +7,22 @@ namespace Aronium.Data
     {
         private bool _disposed;
 
+        private static IEnumerable<T> GetListWithRowMapper<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper)
+        {
+            using (var connector = new Connector())
+            {
+                return connector.Select(query, args, rowMapper);
+            }
+        }
+
+        private static IEnumerable<T> GetListWithDataExtractor<T>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T> extractor)
+        {
+            using (var connector = new Connector())
+            {
+                return connector.Select(query, args, extractor);
+            }
+        }
+
         /// <summary>
         /// Dispose object.
         /// </summary>
@@ -83,7 +99,7 @@ namespace Aronium.Data
         /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
         protected IEnumerable<T> GetList<T>(string query)
         {
-            return GetList<T>(query, null, null);
+            return GetListWithRowMapper<T>(query, null, null);
         }
 
         /// <summary>
@@ -107,7 +123,7 @@ namespace Aronium.Data
         /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
         protected IEnumerable<T> GetList<T>(string query, IEnumerable<QueryParameter> args)
         {
-            return GetList<T>(query, args, null);
+            return GetListWithRowMapper<T>(query, args, null);
         }
 
         /// <summary>
@@ -116,14 +132,36 @@ namespace Aronium.Data
         /// <typeparam name="T">Type to instantiate.</typeparam>
         /// <param name="query">SQL query.</param>
         /// <param name="args">SQL query arguments.</param>
-        /// <param name="rowMapper">Row mapper instance used to instantiate specified type.</param>
+        /// <param name="extractor">Row mapper instance used to instantiate specified type.</param>
         /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
         protected IEnumerable<T> GetList<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper)
         {
-            using (var connector = new Connector())
-            {
-                return connector.Select(query, args, rowMapper);
-            }
+            return GetListWithRowMapper(query, args, rowMapper);
+        }
+
+        /// <summary>
+        /// Gets list of specified type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to instantiate.</typeparam>
+        /// <param name="query">SQL query.</param>
+        /// <param name="extractor">Data extractor instance used to instantiate specified type.</param>
+        /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
+        protected IEnumerable<T> GetList<T>(string query, IDataExtractor<T> extractor)
+        {
+            return GetList<T>(query, null, extractor);
+        }
+
+        /// <summary>
+        /// Gets list of specified type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to instantiate.</typeparam>
+        /// <param name="query">SQL query.</param>
+        /// <param name="args">SQL query arguments.</param>
+        /// <param name="extractor">Data extractor instance used to instantiate specified type.</param>
+        /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
+        protected IEnumerable<T> GetList<T>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T> extractor)
+        {
+            return GetListWithDataExtractor(query, args, extractor);
         }
 
         /// <summary>

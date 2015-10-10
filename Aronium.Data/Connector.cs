@@ -261,6 +261,54 @@ namespace Aronium.Data
         }
 
         /// <summary>
+        /// Execute reader and create list of provided type using IRowMapper interface.
+        /// </summary>
+        /// <typeparam name="T">Type of object to create.</typeparam>
+        /// <param name="query">Sql Query.</param>
+        /// <param name="extractor">IDataExtractor used to map object instance from reader.</param>
+        /// <param name="isStoredProcedure">indicating if query type is stored procedure.</param>
+        /// <returns>List of provided object type.</returns>
+        public IEnumerable<T> Select<T>(string query, IDataExtractor<T> extractor)
+        {
+            return Select<T>(query, null, extractor);
+        }
+
+        /// <summary>
+        /// Execute reader and create list of provided type using IRowMapper interface.
+        /// </summary>
+        /// <typeparam name="T">Type of object to create.</typeparam>
+        /// <param name="query">Sql Query.</param>
+        /// <param name="args">Sql Parameters.</param>
+        /// <param name="extractor">IDataExtractor used to map object instance from reader.</param>
+        /// <param name="isStoredProcedure">indicating if query type is stored procedure.</param>
+        /// <returns>List of provided object type.</returns>
+        public IEnumerable<T> Select<T>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T> extractor)
+        {
+            using (SqlConnection Connection = new SqlConnection(ConnectionString))
+            {
+                Connection.Open();
+
+                using (SqlCommand command = Connection.CreateCommand())
+                {
+                    command.CommandText = query;
+
+                    PrepareCommandParameters(command, args);
+
+                    IEnumerable<T> result;
+
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        result = extractor.Extract(reader);
+
+                        reader.Close();
+                    }
+
+                    return result;
+                }
+            }
+        }
+
+        /// <summary>
         /// Execute reader and create instance of provided type using IRowMapper interface.
         /// </summary>
         /// <typeparam name="T">Type of object to create.</typeparam>
