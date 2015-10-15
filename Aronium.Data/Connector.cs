@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Data;
 using Aronium.Data.Exceptions;
+using System.Collections;
 
 namespace Aronium.Data
 {
@@ -120,10 +121,27 @@ namespace Aronium.Data
         {
             if (args != null && args.Any())
             {
-                command.Parameters.AddRange(args.Select(x => new SqlParameter(x.Name, x.Value ?? DBNull.Value)
+                foreach (QueryParameter parameter in args)
                 {
-                    Direction = x.IsOutput ? ParameterDirection.Output : ParameterDirection.Input
-                }).ToArray());
+                    if (parameter.Value != null && !(parameter.Value is string) && typeof(IEnumerable).IsAssignableFrom(parameter.Value.GetType()))
+                    {
+                        var parameterName = parameter.Name.Replace("@", string.Empty);
+
+                        string replacement = string.Join(",", ((IEnumerable)parameter.Value).Cast<object>().Select((value, pos) => string.Format("@{0}__{1}", parameterName, pos)));
+
+                        // Replace original command text with parametrized query
+                        command.CommandText = command.CommandText.Replace(string.Format("@{0}", parameterName), replacement);
+
+                        command.Parameters.AddRange(((IEnumerable)parameter.Value).Cast<object>().Select((value, pos) => new SqlParameter(string.Format("@{0}__{1}", parameterName, pos), value ?? DBNull.Value)).ToArray());
+                    }
+                    else
+                    {
+                        command.Parameters.Add(new SqlParameter(parameter.Name, parameter.Value ?? DBNull.Value)
+                        {
+                            Direction = parameter.IsOutput ? ParameterDirection.Output : ParameterDirection.Input
+                        });
+                    }
+                }
             }
         }
 
