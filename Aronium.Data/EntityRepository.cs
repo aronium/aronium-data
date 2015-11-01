@@ -254,6 +254,7 @@ namespace Aronium.Data
         {
             return GetEntities<T>(query, null);
         }
+
         /// <summary>
         /// Gets auto mapped list of entities of type <typeparamref name="T"/>.
         /// </summary>

@@ -29,5 +29,15 @@ namespace Aronium.Data
         {
             return record.IsDBNull(ordinal) ? 0M : record.GetDecimal(ordinal);
         }
+
+        public static T GetValueOrDefault<T>(this IDataRecord record, string fieldName)
+        {
+            return record.GetValueOrDefault<T>(record.GetOrdinal(fieldName));
+        }
+
+        public static T GetValueOrDefault<T>(this IDataRecord record, int ordinal)
+        {
+            return (T)(record.IsDBNull(ordinal) ? default(T) : record.GetValue(ordinal));
+        }
     }
 }
