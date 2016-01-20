@@ -28,8 +28,8 @@ namespace Aronium.Data
         /// </summary>
         public string Server
         {
-            get { return Connector._server; }
-            set { Connector._server = value; }
+            get { return _server; }
+            set { _server = value; }
         }
 
         /// <summary>
@@ -37,8 +37,8 @@ namespace Aronium.Data
         /// </summary>
         public string Database
         {
-            get { return Connector._database; }
-            set { Connector._database = value; }
+            get { return _database; }
+            set { _database = value; }
         }
 
         /// <summary>
@@ -46,8 +46,8 @@ namespace Aronium.Data
         /// </summary>
         public string Username
         {
-            get { return Connector._username; }
-            set { Connector._username = value; }
+            get { return _username; }
+            set { _username = value; }
         }
 
         /// <summary>
@@ -55,14 +55,14 @@ namespace Aronium.Data
         /// </summary>
         public string Password
         {
-            get { return Connector._password; }
-            set { Connector._password = value; }
+            get { return _password; }
+            set { _password = value; }
         }
 
         /// <summary>
         /// Gets or sets default connection timeout.
         /// </summary>
-        public int ConnectionTimeout
+        public static int ConnectionTimeout
         {
             get { return _connectionTimeout; }
             set { _connectionTimeout = value; }
@@ -71,7 +71,7 @@ namespace Aronium.Data
         /// <summary>
         /// Gets current connection string.
         /// </summary>
-        public string ConnectionString
+        public static string ConnectionString
         {
             get
             {
@@ -96,14 +96,14 @@ namespace Aronium.Data
 
         #region - Private methods -
 
-        private string CreateConnectionString(string appName)
+        private static string CreateConnectionString(string appName)
         {
             SqlConnectionStringBuilder cb = new SqlConnectionStringBuilder();
-            cb.DataSource = Server;
-            cb.InitialCatalog = Database;
+            cb.DataSource = _server;
+            cb.InitialCatalog = _database;
             cb.MultipleActiveResultSets = true;
-            cb.UserID = Username;
-            cb.Password = Password;
+            cb.UserID = _username;
+            cb.Password = _password;
             cb.Pooling = true;
 
             if (ConnectionTimeout > 0)
@@ -189,10 +189,10 @@ namespace Aronium.Data
             this.Database = database;
             this.Username = username;
             this.Password = password;
-            this.ConnectionTimeout = connectionTimeout;
+            ConnectionTimeout = connectionTimeout;
 
-            // When connect is executed, make sure connection string is reset
-            this.ConnectionString = null;
+            // When connect is executed, make sure connection string is cleared and reset
+            ConnectionString = null;
 
             using (SqlConnection connection = new SqlConnection(ConnectionString))
             {
