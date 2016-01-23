@@ -40,7 +40,7 @@ namespace Aronium.Data.Exceptions
                 this.ParseTableName(ex.Message);
                 this.Kind = DataConstraindErrorKind.Constraint;
             }
-            else if (ex.Number == 2627)
+            else if (ex.Number == 2627 || ex.Number == 2601)
             {
                 this.Kind = DataConstraindErrorKind.DuplicateKey;
             }

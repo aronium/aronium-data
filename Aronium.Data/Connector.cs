@@ -512,7 +512,7 @@ namespace Aronium.Data
                 }
                 catch (SqlException ex)
                 {
-                    if (ex.Number == 547 || ex.Number == 2627)
+                    if (ex.Number == 547 || ex.Number == 2627 || ex.Number == 2601) 
                     {
                         throw new DataConstraintException(ex);
                     }
