@@ -14,9 +14,9 @@ namespace Aronium.Data
     {
         #region - Fields -
 
-        private bool _disposed;
         private Type _type;
         private string _selectQuery;
+        private string _insertQuery;
 
         private static readonly string INSERT = "INSERT INTO [{0}] ({1}) VALUES ({2})";
         private static readonly string SELECT = "SELECT {0} FROM [{1}]";
@@ -60,6 +60,27 @@ namespace Aronium.Data
             }
         }
 
+        /// <summary>
+        /// Gets insert query for entity type.
+        /// </summary>
+        protected string InsertQueryString
+        {
+            get
+            {
+                if (_insertQuery == null)
+                {
+                    var properties = GetEntityPropertyNames(true);
+
+                    var columns = string.Join(",", properties.Select(property => string.Format("[{0}]", property)));
+                    var arguments = string.Join(",", properties.Select(property => string.Format("@{0}", property)));
+
+                    _insertQuery = string.Format(INSERT, EntityType.Name, columns, arguments);
+                }
+
+                return _insertQuery;
+            }
+        }
+
         #endregion
 
         #region - Private methods -
@@ -68,9 +89,9 @@ namespace Aronium.Data
         /// Gets list of property names.
         /// </summary>
         /// <returns></returns>
-        private IEnumerable<string> GetEntityPropertyNames()
+        private IEnumerable<string> GetEntityPropertyNames(bool excludeIdentityColumns = false)
         {
-            return EntityType.GetProperties().Where(x => x.CanWrite && !x.GetSetMethod().IsVirtual).Select(x => x.Name);
+            return EntityType.GetProperties().Where(x => x.CanWrite && !x.GetSetMethod().IsVirtual && (!excludeIdentityColumns || !x.GetCustomAttributes(typeof(IdentityColumnAttribute),true).Any())).Select(x => x.Name);
         }
 
         #endregion
@@ -102,18 +123,11 @@ namespace Aronium.Data
         /// <returns>True if inserted succesfully, otherwise false.</returns>
         public virtual bool Insert(TEntity entity)
         {
-            var properties = GetEntityPropertyNames();
-
-            var columns = string.Join(",", properties.Select(property => string.Format("[{0}]", property)));
-            var arguments = string.Join(",", properties.Select(property => string.Format("@{0}", property)));
-
-            var sql = string.Format(INSERT, EntityType.Name, columns, arguments);
-
             List<QueryParameter> parameters = new List<QueryParameter>();
 
             OnBeforeInsert(entity);
 
-            foreach (var prop in properties)
+            foreach (var prop in GetEntityPropertyNames(true))
             {
                 var propertyValue = EntityType.GetProperty(prop).GetValue(entity, null);
                 if (propertyValue == null)
@@ -128,7 +142,7 @@ namespace Aronium.Data
                 parameters.Add(new QueryParameter(string.Format("@{0}", prop), propertyValue));
             }
 
-            var rowsAffected = Execute(sql, parameters);
+            var rowsAffected = Execute(InsertQueryString, parameters);
 
             OnAfterInsert(entity);
 

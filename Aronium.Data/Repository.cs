@@ -15,14 +15,6 @@ namespace Aronium.Data
             }
         }
 
-        private static IEnumerable<T> GetListWithDataExtractor<T>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T> extractor)
-        {
-            using (var connector = new Connector())
-            {
-                return connector.Select(query, args, extractor);
-            }
-        }
-
         /// <summary>
         /// Dispose object.
         /// </summary>
@@ -161,7 +153,8 @@ namespace Aronium.Data
         /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
         protected IEnumerable<T> GetList<T>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T> extractor)
         {
-            return GetListWithDataExtractor(query, args, extractor);
+            using (var connector = new Connector())
+                return connector.Select(query, args, extractor);
         }
 
         /// <summary>

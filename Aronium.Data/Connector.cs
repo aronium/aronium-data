@@ -5,6 +5,7 @@ using System.Linq;
 using System.Data;
 using Aronium.Data.Exceptions;
 using System.Collections;
+using System.Web.Configuration;
 
 namespace Aronium.Data
 {
@@ -18,6 +19,7 @@ namespace Aronium.Data
         private static string _database;
         private static string _username;
         private static string _password;
+        private static string _connectionStringName;
 
         #endregion
 
@@ -69,7 +71,7 @@ namespace Aronium.Data
         }
 
         /// <summary>
-        /// Gets current connection string.
+        /// Gets or sets connection string.
         /// </summary>
         public static string ConnectionString
         {
@@ -78,7 +80,7 @@ namespace Aronium.Data
                 if (string.IsNullOrEmpty(_connectionString))
                 {
                     string appName = null;
-                    if(System.Reflection.Assembly.GetEntryAssembly()!= null)
+                    if (System.Reflection.Assembly.GetEntryAssembly() != null)
                         appName = System.Reflection.Assembly.GetEntryAssembly().GetName().Name;
 
                     _connectionString = CreateConnectionString(appName);
@@ -86,9 +88,27 @@ namespace Aronium.Data
 
                 return _connectionString;
             }
-            private set
+            set
             {
                 _connectionString = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets connection string name used for reading connection string from configuration or web.config file.
+        /// </summary>
+        public static string ConnectionStringName
+        {
+            get
+            {
+                return _connectionStringName;
+            }
+            set
+            {
+                if (value != null)
+                    ConnectionString = WebConfigurationManager.ConnectionStrings[value].ConnectionString;
+
+                _connectionStringName = value;
             }
         }
 
@@ -512,7 +532,7 @@ namespace Aronium.Data
                 }
                 catch (SqlException ex)
                 {
-                    if (ex.Number == 547 || ex.Number == 2627 || ex.Number == 2601) 
+                    if (ex.Number == 547 || ex.Number == 2627 || ex.Number == 2601)
                     {
                         throw new DataConstraintException(ex);
                     }
