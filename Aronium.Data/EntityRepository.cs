@@ -21,7 +21,7 @@ namespace Aronium.Data
         private static readonly string INSERT = "INSERT INTO [{0}] ({1}) VALUES ({2})";
         private static readonly string SELECT = "SELECT {0} FROM [{1}]";
         private static readonly string DELETE = "DELETE FROM [{0}] WHERE ID=@ID";
-        private static readonly string SELECT_BY_ID = "SELECT {0} FROM [{1}] WHERE ID=@ID";
+        private static readonly string SELECT_BY_ID = "{0} WHERE ID=@ID";
 
         #endregion
 
@@ -43,7 +43,7 @@ namespace Aronium.Data
         /// <summary>
         /// Gets select query for entity type.
         /// </summary>
-        protected string SelectQueryString
+        protected virtual string SelectQueryString
         {
             get
             {
@@ -63,7 +63,7 @@ namespace Aronium.Data
         /// <summary>
         /// Gets insert query for entity type.
         /// </summary>
-        protected string InsertQueryString
+        protected virtual string InsertQueryString
         {
             get
             {
@@ -179,7 +179,7 @@ namespace Aronium.Data
 
                 var columns = string.Join(",", properties.Select(property => string.Format("[{0}]", property)));
 
-                var sql = string.Format(SELECT_BY_ID, columns, EntityType.Name);
+                var sql = string.Format(SELECT_BY_ID, SelectQueryString);
 
                 var entity = connector.SelectEntity<TEntity>(sql, new[] {
                     new QueryParameter("@ID", id)
