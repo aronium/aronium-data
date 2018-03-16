@@ -9,7 +9,7 @@ namespace Aronium.Data.Exceptions
     /// <summary>
     /// Indicates violation kind.
     /// </summary>
-    public enum DataConstraindErrorKind
+    public enum DataConstraintErrorKind
     {
         /// <summary>
         /// Indicates foreign key constraing violation.
@@ -38,11 +38,11 @@ namespace Aronium.Data.Exceptions
             if (ex.Number == 547)
             {
                 this.ParseTableName(ex.Message);
-                this.Kind = DataConstraindErrorKind.Constraint;
+                this.Kind = DataConstraintErrorKind.Constraint;
             }
             else if (ex.Number == 2627 || ex.Number == 2601)
             {
-                this.Kind = DataConstraindErrorKind.DuplicateKey;
+                this.Kind = DataConstraintErrorKind.DuplicateKey;
             }
         }
 
@@ -58,7 +58,7 @@ namespace Aronium.Data.Exceptions
         /// <summary>
         /// Gets exception kind.
         /// </summary>
-        public DataConstraindErrorKind Kind { get; private set; }
+        public DataConstraintErrorKind Kind { get; private set; }
 
         /// <summary>
         /// Gets violated table name.

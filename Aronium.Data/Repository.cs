@@ -161,6 +161,16 @@ namespace Aronium.Data
         /// Executes specified SQL query and returns number of rows affected.
         /// </summary>
         /// <param name="query">SQL query.</param>
+        /// <returns>Number of rows affected by the query execution.</returns>
+        protected int Execute(string query)
+        {
+            return Execute(query, null, false);
+        }
+
+        /// <summary>
+        /// Executes specified SQL query and returns number of rows affected.
+        /// </summary>
+        /// <param name="query">SQL query.</param>
         /// <param name="args">SQL query arguments.</param>
         /// <returns>Number of rows affected by the query execution.</returns>
         protected int Execute(string query, IEnumerable<QueryParameter> args)

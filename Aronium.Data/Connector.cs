@@ -143,7 +143,15 @@ namespace Aronium.Data
             {
                 foreach (QueryParameter parameter in args)
                 {
-                    if (parameter.Value != null && !(parameter.Value is string) && typeof(IEnumerable).IsAssignableFrom(parameter.Value.GetType()))
+                    if(parameter.IsImage)
+                    {
+                        command.Parameters.Add(new SqlParameter(parameter.Name, parameter.Value ?? DBNull.Value)
+                        {
+                            SqlDbType = SqlDbType.Image,
+                            Direction = parameter.IsOutput ? ParameterDirection.Output : ParameterDirection.Input
+                        });
+                    }
+                    else if (parameter.Value != null && !(parameter.Value is string) && typeof(IEnumerable).IsAssignableFrom(parameter.Value.GetType()))
                     {
                         var parameterName = parameter.Name.Replace("@", string.Empty);
 
@@ -174,6 +182,45 @@ namespace Aronium.Data
                     arg.Value = command.Parameters[arg.Name].Value;
                 }
             }
+        }
+
+        private object SelectValueInternal<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper, SqlConnection connection, SqlTransaction transaction = null)
+        {
+            object obj = null;
+
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = query;
+
+                if(transaction != null)
+                {
+                    command.Transaction = transaction;
+                }
+
+                PrepareCommandParameters(command, args);
+
+                using (SqlDataReader reader = command.ExecuteReader(CommandBehavior.SingleResult))
+                {
+                    reader.Read();
+
+                    if (reader.HasRows)
+                    {
+                        if (rowMapper != null)
+                        {
+                            obj = rowMapper.Map(reader);
+                        }
+                        else
+                        {
+                            // Used for primitive types
+                            obj = reader[0];
+                        }
+                    }
+
+                    reader.Close();
+                }
+            }
+
+            return obj;
         }
 
         #endregion
@@ -353,42 +400,16 @@ namespace Aronium.Data
         /// <param name="args">Sql Parameters.</param>
         /// <param name="query">Sql Query.</param>
         /// <param name="rowMapper">IRowMapper used to map object instance from reader.</param>
-        /// <param name="isStoredProcedure">Indicating whether query type is stored procedure.</param>
         /// <returns>Instance of object type.</returns>
         public T SelectValue<T>(string query, IEnumerable<QueryParameter> args = null, IRowMapper<T> rowMapper = null)
         {
             object obj = null;
 
-            using (SqlConnection Connection = new SqlConnection(ConnectionString))
+            using (SqlConnection connection = new SqlConnection(ConnectionString))
             {
-                Connection.Open();
+                connection.Open();
 
-                using (SqlCommand command = Connection.CreateCommand())
-                {
-                    command.CommandText = query;
-
-                    PrepareCommandParameters(command, args);
-
-                    using (SqlDataReader reader = command.ExecuteReader(CommandBehavior.SingleResult))
-                    {
-                        reader.Read();
-
-                        if (reader.HasRows)
-                        {
-                            if (rowMapper != null)
-                            {
-                                obj = rowMapper.Map(reader);
-                            }
-                            else
-                            {
-                                // Used for primitive types
-                                obj = reader[0];
-                            }
-                        }
-
-                        reader.Close();
-                    }
-                }
+                obj = SelectValueInternal(query, args, rowMapper, connection);
             }
 
             if (obj == null)
@@ -396,6 +417,27 @@ namespace Aronium.Data
 
             return (T)obj;
         }
+
+        /// <summary>
+        /// Execute reader and create instance of provided type using IRowMapper interface.
+        /// </summary>
+        /// <typeparam name="T">Type of object to create.</typeparam>
+        /// <param name="args">Sql Parameters.</param>
+        /// <param name="query">Sql Query.</param>
+        /// <param name="rowMapper">IRowMapper used to map object instance from reader.</param>
+        /// <param name="connection"><see cref="SqlConnection"/> instance to use for specified query.</param>
+        /// <param name="connection"><see cref="SqlTransaction"/> instance to use for specified query.</param>
+        /// <returns>Instance of object type.</returns>
+        public T SelectValue<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper, SqlConnection connection, SqlTransaction transaction)
+        {
+            object obj = SelectValueInternal(query, args, rowMapper, connection, transaction);
+
+            if (obj == null)
+                return default(T);
+
+            return (T)obj;
+        }
+
 
         /// <summary>
         /// Gets entity instance.
@@ -548,6 +590,25 @@ namespace Aronium.Data
             }
 
             return affectedRows;
+        }
+
+        /// <summary>
+        /// Executes simple sql query with previously open connection and returns number of affected rows.
+        /// </summary>
+        /// <param name="query">Sql Query to execute</param>
+        /// <param name="args">Sql query parameters to use.</param>
+        /// <param name="connection">SQL connection used for execution</param>
+        /// <returns>Number of rows affected by command.</returns>
+        public int Execute(string query, IEnumerable<QueryParameter> args, SqlConnection connection)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = query;
+
+                PrepareCommandParameters(command, args);
+
+                return command.ExecuteNonQuery();
+            }
         }
 
         #endregion

@@ -17,13 +17,22 @@ namespace Aronium.Data
         private Type _type;
         private string _selectQuery;
         private string _insertQuery;
+        private string _insertWithOutputQueryTemplate;
 
         private static readonly string INSERT = "INSERT INTO [{0}] ({1}) VALUES ({2})";
+        private static readonly string INSERT_OUTPUT = "INSERT INTO [{0}] ({1}) OUTPUT INSERTED.[{2}] VALUES ({3})";
         private static readonly string SELECT = "SELECT {0} FROM [{1}]";
         private static readonly string DELETE = "DELETE FROM [{0}] WHERE ID=@ID";
         private static readonly string SELECT_BY_ID = "{0} WHERE ID=@ID";
 
+        private readonly string _tableName;
+
         #endregion
+
+        public EntityRepository()
+        {
+            _tableName = this.GetType().GetCustomAttributes(typeof(TableNameAttribute), true).Cast<TableNameAttribute>().FirstOrDefault()?.Name ?? EntityType.Name;
+        }
 
         #region - Properties -
 
@@ -36,7 +45,19 @@ namespace Aronium.Data
             {
                 if (_type == null)
                     _type = typeof(TEntity);
+
                 return _type;
+            }
+        }
+
+        /// <summary>
+        /// Gets table name.
+        /// </summary>
+        private string TableName
+        {
+            get
+            {
+                return _tableName;
             }
         }
 
@@ -53,7 +74,7 @@ namespace Aronium.Data
 
                     var columns = string.Join(",", properties.Select(property => string.Format("[{0}]", property)));
 
-                    _selectQuery = string.Format(SELECT, columns, EntityType.Name);
+                    _selectQuery = string.Format(SELECT, columns, TableName);
                 }
 
                 return _selectQuery;
@@ -81,6 +102,27 @@ namespace Aronium.Data
             }
         }
 
+        /// <summary>
+        /// Gets insert query string pattern with output column.
+        /// </summary>
+        protected virtual string InsertQueryStringWithOutputColumn
+        {
+            get
+            {
+                if (_insertWithOutputQueryTemplate == null)
+                {
+                    var properties = GetEntityPropertyNames(true);
+
+                    var columns = string.Join(",", properties.Select(property => string.Format("[{0}]", property)));
+                    var arguments = string.Join(",", properties.Select(property => string.Format("@{0}", property)));
+
+                    _insertWithOutputQueryTemplate = string.Format(INSERT_OUTPUT, TableName, columns, "{0}", arguments);
+                }
+
+                return _insertWithOutputQueryTemplate;
+            }
+        }
+
         #endregion
 
         #region - Private methods -
@@ -91,7 +133,7 @@ namespace Aronium.Data
         /// <returns></returns>
         private IEnumerable<string> GetEntityPropertyNames(bool excludeIdentityColumns = false)
         {
-            return EntityType.GetProperties().Where(x => x.CanWrite && !x.GetSetMethod().IsVirtual && (!excludeIdentityColumns || !x.GetCustomAttributes(typeof(IdentityColumnAttribute),true).Any())).Select(x => x.Name);
+            return EntityType.GetProperties().Where(x => x.CanWrite && !x.GetSetMethod().IsVirtual && (!excludeIdentityColumns || !x.GetCustomAttributes(typeof(IdentityColumnAttribute), true).Any())).Select(x => x.Name);
         }
 
         #endregion
@@ -109,6 +151,13 @@ namespace Aronium.Data
         /// </summary>
         /// <param name="entity"></param>
         public virtual void OnAfterInsert(TEntity entity) { }
+
+        /// <summary>
+        /// Occurs after entity is inserted.
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <param name="identity">Inserted identify value.</param>
+        public virtual void OnAfterInsert<T>(TEntity entity, T identity) { }
 
         /// <summary>
         /// Occurs after entity is selected.
@@ -147,6 +196,40 @@ namespace Aronium.Data
             OnAfterInsert(entity);
 
             return rowsAffected > 0;
+        }
+
+        /// <summary>
+        /// Inserts entity with specified output column to be used as a return value.
+        /// </summary>
+        /// <param name="entity">Entity to insert.</param>
+        /// <param name="identityColumnName">Column name used for output value. Mostly used with auto increment id column.</param>
+        /// <returns>True if inserted succesfully, otherwise false.</returns>
+        public virtual T Insert<T>(TEntity entity, string identityColumnName)
+        {
+            List<QueryParameter> parameters = new List<QueryParameter>();
+
+            OnBeforeInsert(entity);
+
+            foreach (var prop in GetEntityPropertyNames(true))
+            {
+                var propertyValue = EntityType.GetProperty(prop).GetValue(entity, null);
+                if (propertyValue == null)
+                {
+                    propertyValue = Convert.DBNull;
+                }
+                else if (propertyValue.GetType().IsEnum)
+                {
+                    propertyValue = (int)propertyValue;
+                }
+
+                parameters.Add(new QueryParameter(string.Format("@{0}", prop), propertyValue));
+            }
+
+            T result = Get<T>(string.Format(InsertQueryStringWithOutputColumn, identityColumnName), parameters);
+
+            OnAfterInsert(entity, result);
+
+            return result;
         }
 
         /// <summary>
@@ -289,7 +372,7 @@ namespace Aronium.Data
         /// <param name="id">Entity id.</param>
         public virtual void Delete(object id)
         {
-            var sql = string.Format(DELETE, EntityType.Name);
+            var sql = string.Format(DELETE, TableName);
 
             OnBeforeDelete(id);
 
