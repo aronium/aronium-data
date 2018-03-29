@@ -425,12 +425,11 @@ namespace Aronium.Data
         /// <param name="args">Sql Parameters.</param>
         /// <param name="query">Sql Query.</param>
         /// <param name="rowMapper">IRowMapper used to map object instance from reader.</param>
-        /// <param name="connection"><see cref="SqlConnection"/> instance to use for specified query.</param>
         /// <param name="connection"><see cref="SqlTransaction"/> instance to use for specified query.</param>
         /// <returns>Instance of object type.</returns>
-        public T SelectValue<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper, SqlConnection connection, SqlTransaction transaction)
+        public T SelectValue<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper, SqlTransaction transaction)
         {
-            object obj = SelectValueInternal(query, args, rowMapper, connection, transaction);
+            object obj = SelectValueInternal(query, args, rowMapper, transaction.Connection, transaction);
 
             if (obj == null)
                 return default(T);
@@ -597,13 +596,14 @@ namespace Aronium.Data
         /// </summary>
         /// <param name="query">Sql Query to execute</param>
         /// <param name="args">Sql query parameters to use.</param>
-        /// <param name="connection">SQL connection used for execution</param>
+        /// <param name="transaction">SQL connection used for execution</param>
         /// <returns>Number of rows affected by command.</returns>
-        public int Execute(string query, IEnumerable<QueryParameter> args, SqlConnection connection)
+        public int Execute(string query, IEnumerable<QueryParameter> args, SqlTransaction transaction)
         {
-            using (SqlCommand command = connection.CreateCommand())
+            using (SqlCommand command = transaction.Connection.CreateCommand())
             {
                 command.CommandText = query;
+                command.Transaction = transaction;
 
                 PrepareCommandParameters(command, args);
 
