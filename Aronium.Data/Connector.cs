@@ -223,6 +223,47 @@ namespace Aronium.Data
             return obj;
         }
 
+        private IEnumerable<T> SelectInternal<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper, SqlConnection connection, SqlTransaction transaction = null)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = query;
+
+                if (transaction != null)
+                {
+                    command.Transaction = transaction;
+                }
+
+                PrepareCommandParameters(command, args);
+
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    var isNullable = Nullable.GetUnderlyingType(typeof(T)) != null;
+
+                    while (reader.Read())
+                    {
+                        if (rowMapper != null)
+                        {
+                            yield return rowMapper.Map(reader);
+                        }
+                        else
+                        {
+                            // Check for null values and return default instance of T (should be nullable)
+                            // If not checked for NULL values, conversion will fail, resulting in InvalidCastException being thrown
+                            if (isNullable && reader[0] == Convert.DBNull)
+                            {
+                                yield return default(T);
+                            }
+                            else
+                                yield return (T)reader[0];
+                        }
+                    }
+
+                    reader.Close();
+                }
+            }
+        }
+
         #endregion
 
         #region - Public methods -
@@ -288,7 +329,6 @@ namespace Aronium.Data
         /// <typeparam name="T">Type of object to create.</typeparam>
         /// <param name="query">Sql Query.</param>
         /// <param name="rowMapper">IRowMapper used to map object instance from reader.</param>
-        /// <param name="isStoredProcedure">indicating if query type is stored procedure.</param>
         /// <returns>List of provided object type.</returns>
         public IEnumerable<T> Select<T>(string query, IRowMapper<T> rowMapper)
         {
@@ -302,47 +342,32 @@ namespace Aronium.Data
         /// <param name="query">Sql Query.</param>
         /// <param name="args">Sql Parameters.</param>
         /// <param name="rowMapper">IRowMapper used to map object instance from reader.</param>
-        /// <param name="isStoredProcedure">indicating if query type is stored procedure.</param>
         /// <returns>List of provided object type.</returns>
         public IEnumerable<T> Select<T>(string query, IEnumerable<QueryParameter> args = null, IRowMapper<T> rowMapper = null)
         {
-            using (SqlConnection Connection = new SqlConnection(ConnectionString))
+            using (SqlConnection connection = new SqlConnection(ConnectionString))
             {
-                Connection.Open();
+                connection.Open();
 
-                using (SqlCommand command = Connection.CreateCommand())
+                foreach(T item in SelectInternal(query, args, rowMapper, connection))
                 {
-                    command.CommandText = query;
-
-                    PrepareCommandParameters(command, args);
-
-                    using (SqlDataReader reader = command.ExecuteReader())
-                    {
-                        var isNullable = Nullable.GetUnderlyingType(typeof(T)) != null;
-
-                        while (reader.Read())
-                        {
-                            if (rowMapper != null)
-                            {
-                                yield return rowMapper.Map(reader);
-                            }
-                            else
-                            {
-                                // Check for null values and return default instance of T (should be nullable)
-                                // If not checked for NULL values, conversion will fail, resulting in InvalidCastException being thrown
-                                if (isNullable && reader[0] == Convert.DBNull)
-                                {
-                                    yield return default(T);
-                                }
-                                else
-                                    yield return (T)reader[0];
-                            }
-                        }
-
-                        reader.Close();
-                    }
+                    yield return item;
                 }
             }
+        }
+
+        /// <summary>
+        /// Execute reader and create list of provided type using IRowMapper interface within existing transaction.
+        /// </summary>
+        /// <typeparam name="T">Type of object to create.</typeparam>
+        /// <param name="query">Sql Query.</param>
+        /// <param name="args">Sql Parameters.</param>
+        /// <param name="rowMapper">IRowMapper used to map object instance from reader.</param>
+        /// <param name="transaction">Existing <see cref="SqlTransaction"/> to use with this command.</param>
+        /// <returns>List of provided object type.</returns>
+        public IEnumerable<T> Select<T>(string query, IEnumerable<QueryParameter> args, IRowMapper<T> rowMapper, SqlTransaction transaction)
+        {
+            return SelectInternal(query, args, rowMapper, transaction.Connection, transaction);
         }
 
         /// <summary>
@@ -436,8 +461,7 @@ namespace Aronium.Data
 
             return (T)obj;
         }
-
-
+        
         /// <summary>
         /// Gets entity instance.
         /// </summary>
