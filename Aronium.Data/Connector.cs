@@ -264,6 +264,32 @@ namespace Aronium.Data
             }
         }
 
+        private IEnumerable<T> SelectWith<T>(string query, IEnumerable<QueryParameter> args, Func<SqlDataReader, IEnumerable<T>> callback)
+        {
+            using (SqlConnection Connection = new SqlConnection(ConnectionString))
+            {
+                Connection.Open();
+
+                using (SqlCommand command = Connection.CreateCommand())
+                {
+                    command.CommandText = query;
+
+                    PrepareCommandParameters(command, args);
+
+                    IEnumerable<T> result;
+
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        result = callback(reader);
+
+                        reader.Close();
+                    }
+
+                    return result;
+                }
+            }
+        }
+
         #endregion
 
         #region - Public methods -
@@ -394,28 +420,29 @@ namespace Aronium.Data
         /// <returns>List of provided object type.</returns>
         public IEnumerable<T> Select<T>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T> extractor)
         {
-            using (SqlConnection Connection = new SqlConnection(ConnectionString))
+            return SelectWith(query, args, (reader) =>
             {
-                Connection.Open();
+                return extractor.Extract(reader);
+            });
+        }
 
-                using (SqlCommand command = Connection.CreateCommand())
-                {
-                    command.CommandText = query;
 
-                    PrepareCommandParameters(command, args);
-
-                    IEnumerable<T> result;
-
-                    using (SqlDataReader reader = command.ExecuteReader())
-                    {
-                        result = extractor.Extract(reader);
-
-                        reader.Close();
-                    }
-
-                    return result;
-                }
-            }
+        /// <summary>
+        /// Execute reader and create list of provided type using IDataExtractor interface.
+        /// </summary>
+        /// <typeparam name="T">Type of object to create.</typeparam>
+        /// <typeparam name="P">Extractor arguments type.</typeparam>
+        /// <param name="query">Sql Query.</param>
+        /// <param name="args">Sql Parameters.</param>
+        /// <param name="extractor">IDataExtractor used to map object instance from reader.</param>
+        /// <param name="extractorArgs">Arguments to pass to extract method.</param>
+        /// <returns>List of provided object type.</returns>
+        public IEnumerable<T> Select<T, P>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T, P> extractor, P extractorArgs)
+        {
+            return SelectWith(query, args, (reader) =>
+            {
+                return extractor.Extract(reader, extractorArgs);
+            });
         }
 
         /// <summary>

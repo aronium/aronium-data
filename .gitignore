@@ -1,6 +1,7 @@
 *.suo
 *.cache
 *.user
+*.vs
 
 [Dd]ebug/
 [Rr]elease/

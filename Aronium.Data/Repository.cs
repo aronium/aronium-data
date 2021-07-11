@@ -158,6 +158,36 @@ namespace Aronium.Data
         }
 
         /// <summary>
+        /// Gets list of specified type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to instantiate.</typeparam>
+        /// <typeparam name="P">Extractor parameter type.</typeparam>
+        /// <param name="query">SQL query.</param>
+        /// <param name="extractor">Data extractor instance used to instantiate specified type.</param>
+        /// <param name="extractorArgs">Extractor argumentse.</param>
+        /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
+        protected IEnumerable<T> GetList<T, P>(string query, IDataExtractor<T, P> extractor, P extractorArgs)
+        {
+            return GetList<T, P>(query, null, extractor, extractorArgs);
+        }
+
+        /// <summary>
+        /// Gets list of specified type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Type to instantiate.</typeparam>
+        /// <typeparam name="P">Extractor parameter type.</typeparam>
+        /// <param name="query">SQL query.</param>
+        /// <param name="args">SQL query arguments.</param>
+        /// <param name="extractor">Data extractor instance used to instantiate specified type.</param>
+        /// <param name="extractorArgs">Extractor argumentse.</param>
+        /// <returns>List of instances of type <typeparamref name="T"/>.</returns>
+        protected IEnumerable<T> GetList<T, P>(string query, IEnumerable<QueryParameter> args, IDataExtractor<T, P> extractor, P extractorArgs)
+        {
+            using (var connector = new Connector())
+                return connector.Select(query, args, extractor, extractorArgs);
+        }
+
+        /// <summary>
         /// Executes specified SQL query and returns number of rows affected.
         /// </summary>
         /// <param name="query">SQL query.</param>
