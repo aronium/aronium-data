@@ -143,7 +143,23 @@ namespace Aronium.Data
             {
                 foreach (QueryParameter parameter in args)
                 {
-                    if(parameter.IsImage)
+                    if (parameter is VarbinaryQueryParameter)
+                    {
+                        command.Parameters.Add(new SqlParameter(parameter.Name, parameter.Value ?? DBNull.Value)
+                        {
+                            SqlDbType = SqlDbType.VarBinary,
+                            Direction = parameter.IsOutput ? ParameterDirection.Output : ParameterDirection.Input
+                        });
+                    }
+                    else if (parameter is XmlQueryParameter)
+                    {
+                        command.Parameters.Add(new SqlParameter(parameter.Name, SqlDbType.VarChar, -1)
+                        {
+                            Value = parameter.Value ?? DBNull.Value,
+                            Direction = parameter.IsOutput ? ParameterDirection.Output : ParameterDirection.Input
+                        });
+                    }
+                    else if (parameter is ImageQueryParameter)
                     {
                         command.Parameters.Add(new SqlParameter(parameter.Name, parameter.Value ?? DBNull.Value)
                         {
@@ -192,7 +208,7 @@ namespace Aronium.Data
             {
                 command.CommandText = query;
 
-                if(transaction != null)
+                if (transaction != null)
                 {
                     command.Transaction = transaction;
                 }
@@ -375,7 +391,7 @@ namespace Aronium.Data
             {
                 connection.Open();
 
-                foreach(T item in SelectInternal(query, args, rowMapper, connection))
+                foreach (T item in SelectInternal(query, args, rowMapper, connection))
                 {
                     yield return item;
                 }
@@ -488,7 +504,7 @@ namespace Aronium.Data
 
             return (T)obj;
         }
-        
+
         /// <summary>
         /// Gets entity instance.
         /// </summary>

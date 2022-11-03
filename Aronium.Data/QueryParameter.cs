@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace Aronium.Data
 {
@@ -42,19 +40,6 @@ namespace Aronium.Data
         }
 
         /// <summary>
-        /// Creates new instance of QueryParameter class.
-        /// </summary>
-        /// <param name="name">Parameter name.</param>
-        /// <param name="value">Parameter value.</param>
-        /// <param name="isOutput">Sets a value indicating if parameter is Output.</param>
-        /// <param name="IsImage">Sets a value indicating if parameter should be treated as SqlDbType.Image.</param>
-        public QueryParameter(string name, object value, bool isOutput, bool IsImage)
-            : this(name, value, isOutput)
-        {
-            this.IsImage = IsImage;
-        }
-
-        /// <summary>
         /// Gets or sets parameter name.
         /// </summary>
         public string Name { get; set; }
@@ -68,11 +53,6 @@ namespace Aronium.Data
         /// Gets or sets a value indicating whether the parameter expects output value.
         /// </summary>
         public bool IsOutput { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether parameter type should be treated as SqlDbType.Image.
-        /// </summary>
-        public bool IsImage { get; set; }
 
         /// <summary>
         /// Gets query parameter array with single parameter value.
