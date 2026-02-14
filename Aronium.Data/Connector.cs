@@ -306,18 +306,65 @@ namespace Aronium.Data
             }
         }
 
-        /// <summary>
-        /// In case of null or <see cref="DBNull"/> returns default value, othrwise, returns instance of specified type <typeparamref name="T"/>.
-        /// </summary>
-        /// <typeparam name="T">Type to return.</typeparam>
-        /// <param name="obj">Object to valudate and return as instance of specified type.</param>
-        /// <returns>Null if object is <see cref="DBNull"/> or instance of specified type.</returns>
-        private static T DefautIfNull<T>(object obj)
+        private static T ResolveSingleResult<T>(IRowMapper<T> rowMapper, object obj)
         {
-            if (obj == null || obj == DBNull.Value)
-                return default;
+            // obj is null => no rows
+            if (obj == null)
+                return HandleMissingValueOrScalar<T>("no rows");
 
-            return (T)obj;
+            // mapper path returns T already; allow it as-is (could be null)
+            if (rowMapper != null)
+                return (T)obj;
+
+            // scalar path
+            return ConvertScalar<T>(obj);
+        }
+
+        private static T ConvertScalar<T>(object raw)
+        {
+            if (raw == null || raw is DBNull)
+                return HandleMissingValueOrScalar<T>("NULL");
+
+            var targetType = typeof(T);
+            var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+            if (underlying == typeof(Guid))
+            {
+                if (raw is Guid g) return (T)(object)g;
+                return (T)(object)new Guid(Convert.ToString(raw));
+            }
+
+            if (underlying == typeof(DateTime))
+            {
+                if (raw is DateTime dt) return (T)(object)dt;
+                return (T)(object)DateTime.Parse(Convert.ToString(raw));
+            }
+
+            if (underlying.IsEnum)
+            {
+                // Works for numeric values (int/long) and for enum underlying types.
+                return (T)Enum.ToObject(underlying, raw);
+            }
+
+            // Covers common cases:
+            // - int <- long (SQLite INTEGER often comes back as Int64)
+            // - decimal <- double/int/long
+            // - bool <- 0/1
+            // - string <- anything convertible
+            return (T)Convert.ChangeType(raw, underlying);
+        }
+
+        private static T HandleMissingValueOrScalar<T>(string reason)
+        {
+            var t = typeof(T);
+            var underlying = Nullable.GetUnderlyingType(t);
+
+            // Reference type OR Nullable<T> => allow missing -> default(T) (null)
+            if (!t.IsValueType || underlying != null)
+                return default(T);
+
+            // Non-nullable value type => throw
+            throw new InvalidOperationException($"Expected a non-null scalar value of type '{t.FullName}', but the query returned {reason}.");
         }
 
         #endregion
@@ -456,7 +503,6 @@ namespace Aronium.Data
             });
         }
 
-
         /// <summary>
         /// Execute reader and create list of provided type using IDataExtractor interface.
         /// </summary>
@@ -494,7 +540,7 @@ namespace Aronium.Data
                 obj = SelectValueInternal(query, args, rowMapper, connection);
             }
 
-            return DefautIfNull<T>(obj);
+            return ResolveSingleResult(rowMapper, obj);
         }
 
         /// <summary>
@@ -510,7 +556,26 @@ namespace Aronium.Data
         {
             object obj = SelectValueInternal(query, args, rowMapper, transaction.Connection, transaction);
 
-            return DefautIfNull<T>(obj);
+            return ResolveSingleResult(rowMapper, obj);
+        }
+
+        /// <summary>
+        /// Execute reader and create instance of provided type using IRowMapper interface.
+        /// </summary>
+        /// <typeparam name="T">Type of object to create.</typeparam>
+        /// <param name="args">Sql Parameters.</param>
+        /// <param name="query">Sql Query.</param>
+        /// <param name="rowMapper">IRowMapper used to map object instance from reader.</param>
+        /// <param name="connection"><see cref="SqlTransaction"/> instance to use for specified query.</param>
+        /// <returns>Instance of object type.</returns>
+        public IEnumerable<T> SelectValues<T>(string query, IEnumerable<QueryParameter> args)
+        {
+            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            {
+                connection.Open();
+
+                return SelectInternal<T>(query, args, null, connection);
+            }
         }
 
         /// <summary>
@@ -683,6 +748,49 @@ namespace Aronium.Data
                 PrepareCommandParameters(command, args);
 
                 return command.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Executes a SQL query and provides an <see cref="IDataReader"/> to the specified handler.
+        /// The handler can read rows using <c>while (reader.Read())</c> and return any computed result.
+        /// </summary>
+        /// <typeparam name="TResult">
+        /// The result type returned by <paramref name="callback"/> (e.g. a list, a single value, or a custom projection).
+        /// </typeparam>
+        /// <param name="query">The SQL query text to execute.</param>
+        /// <param name="args">Optional SQL parameters to add to the command.</param>
+        /// <param name="callback">
+        /// Callback invoked with an open <see cref="IDataReader"/>. The reader is only valid inside this callback.
+        /// </param>
+        /// <returns>The value returned by <paramref name="callback"/>.</returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="query"/> or <paramref name="callback"/> is <c>null</c>.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="query"/> is empty or whitespace.
+        /// </exception>
+        public TResult ExecuteReader<TResult>(string query, IEnumerable<QueryParameter> args, Func<IDataReader, TResult> callback)
+        {
+            if (query == null) throw new ArgumentNullException(nameof(query));
+            if (string.IsNullOrWhiteSpace(query)) throw new ArgumentException("SQL must not be empty.", nameof(query));
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+
+            using (var connection = new SqlConnection(ConnectionString))
+            {
+                connection.Open();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = query;
+
+                    PrepareCommandParameters(command, args);
+
+                    using (var reader = command.ExecuteReader(CommandBehavior.SequentialAccess))
+                    {
+                        return callback(reader);
+                    }
+                }
             }
         }
 
